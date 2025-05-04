@@ -1,0 +1,27 @@
+[project]
+name = "traffy-troffi"
+version = "0.0.1"
+description = ""
+authors = [
+    {name = "Thanapat Chotipun",email = "devpatrick.cho@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "seaborn (>=0.13.2,<0.14.0)",
+    "pyspark (>=3.5.5,<4.0.0)",
+    "streamlit (>=1.45.0,<2.0.0)"
+]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+package-mode = false
+
+[tool.poetry.group.dev.dependencies]
+jupyter = "^1.1.1"
+tqdm = "^4.67.1"
+watchdog = "^6.0.0"
+
