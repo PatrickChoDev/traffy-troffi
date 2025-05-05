@@ -12,6 +12,7 @@ dependencies = [
     "dagster (>=1.10.13,<2.0.0)",
     "dagster-webserver (>=1.10.13,<2.0.0)",
     "pandas (>=2.2.3,<3.0.0)",
+    "boto3 (>=1.38.8,<2.0.0)",
 ]
 
 [build-system]

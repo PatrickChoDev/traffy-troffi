@@ -33,7 +33,7 @@ services:
       - "3900:3900"
       - "3901:3901"
     volumes:
-      - ./docker/garage/garage.toml:/etc/garage.toml
+      - ./docker/garage/garage.toml:/etc/garage.toml:ro
       - traffy-s3-meta:/var/lib/garage/meta
       - traffy-s3-data:/var/lib/garage/data
     healthcheck:
@@ -41,6 +41,22 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  webui:
+    image: khairul169/garage-webui:latest
+    container_name: garage-webui
+    restart: unless-stopped
+    networks:
+      - traffy-troffi
+    depends_on:
+      - garage
+    volumes:
+      - ./docker/garage/garage.toml:/etc/garage.toml:ro
+    ports:
+      - "3909:3909"
+    environment:
+      API_BASE_URL: "http://garage:3903"
+      S3_ENDPOINT_URL: "http://garage:3900"
 
   # Spark master
   spark-master:
