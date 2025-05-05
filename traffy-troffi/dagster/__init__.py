@@ -1,171 +1,147 @@
-from dagster import asset, AssetExecutionContext, Definitions, define_asset_job, ScheduleDefinition
+from dagster import (
+    asset,
+    AssetExecutionContext,
+    Definitions,
+    define_asset_job,
+    ScheduleDefinition,
+    ConfigurableResource,
+    EnvVar
+)
 import requests
-import pandas as pd
-import io
 import boto3
+import json
 from datetime import datetime
+import logging
+from typing import Dict, Any, Optional
 
-# Garage S3 configuration
-S3_ENDPOINT = 'http://localhost:3900'
-S3_ACCESS_KEY = "GK904ad8d9d4e12205f574d8bb"
-S3_SECRET_KEY = "9d9ec2f36a1787ba56675056312ac63719ef48fd198471bbcc722c036fcdae75"
-S3_BUCKET = 'traffy-troffi'
-S3_PREFIX = 'traffy-csvs'
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-@asset
-def drive_csv_to_s3(context: AssetExecutionContext):
-    """Download public CSV file from Google Drive and save it to Garage S3."""
-    # Configuration
-    file_id = "19QkF8i1my99gjbyHe7de_qZNwgrca6R5"  # The ID from the Drive URL
+# Resource classes
+class ApiResource(ConfigurableResource):
+    """Resource for API interactions"""
+    base_url: str
+    timeout: int = 30
+
+    def fetch_data(self) -> Dict[str, Any]:
+        """Fetch data from the API"""
+        logger.info(f"Fetching data from {self.base_url}")
+        try:
+            response = requests.get(self.base_url, timeout=self.timeout)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error fetching API data: {e}")
+            raise
+
+class S3Resource(ConfigurableResource):
+    """Resource for S3 operations"""
+    endpoint_url: str = EnvVar("S3_ENDPOINT")
+    access_key: str = EnvVar("S3_ACCESS_KEY")
+    secret_key: str = EnvVar("S3_SECRET_KEY")
+    bucket_name: str = EnvVar("S3_BUCKET_NAME")
+
+    def get_client(self):
+        """Get configured S3 client"""
+        return boto3.client(
+            's3',
+            endpoint_url=self.endpoint_url,
+            aws_access_key_id=self.access_key,
+            aws_secret_access_key=self.secret_key
+        )
+
+    def upload_json(self, key: str, data: Dict[str, Any]) -> Dict[str, str]:
+        """Upload JSON data to S3"""
+        logger.info(f"Uploading data to {self.bucket_name}/{key}")
+        try:
+            s3_client = self.get_client()
+
+            # Convert data to JSON string
+            json_data = json.dumps(data, ensure_ascii=False)
+
+            # Upload to S3
+            s3_client.put_object(
+                Bucket=self.bucket_name,
+                Key=key,
+                Body=json_data.encode('utf-8'),
+                ContentType='application/json'
+            )
+
+            return {
+                "bucket": self.bucket_name,
+                "key": key
+            }
+        except Exception as e:
+            logger.error(f"Error uploading to S3: {e}")
+            raise
+
+# Asset definition
+@asset(required_resource_keys={"api", "s3"})
+def traffy_geojson_to_s3(context: AssetExecutionContext) -> Dict[str, Any]:
+    """
+    Asset that fetches GeoJSON data from Traffy API and stores it in S3.
+
+    This asset runs on a schedule to keep data up-to-date.
+    """
     # Create timestamp for the filename
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    # Log the process
-    context.log.info(f"Starting download of Google Drive CSV at {timestamp}")
+    # Log start of process
+    context.log.info(f"Starting Traffy GeoJSON data fetch at {timestamp}")
 
-    # Direct download URL for public files
-    download_url = f"https://drive.google.com/uc?export=download&id={file_id}"
+    # Fetch data from API
+    api_data = context.resources.api.fetch_data()
 
-    # Set up S3 client
-    s3_client = boto3.client(
-        's3',
-        endpoint_url=S3_ENDPOINT,
-        aws_access_key_id=S3_ACCESS_KEY,
-        aws_secret_access_key=S3_SECRET_KEY
-    )
+    # Validate the data has expected structure
+    if not isinstance(api_data, dict):
+        raise ValueError(f"API returned unexpected data type: {type(api_data)}")
 
-    # Generate S3 key (path)
-    s3_key = f"{S3_PREFIX}drive_file_{timestamp}.csv"
+    # Check if there's any data
+    context.log.info(f"Received {len(json.dumps(api_data))} bytes of GeoJSON data")
 
-    # Initialize a session for better connection management
-    session = requests.Session()
+    # Generate S3 key with timestamp
+    s3_key = f"traffy/geojson/traffy_geojson_{timestamp}.json"
 
-    # First request to handle any redirects and get cookies for large files
-    response = session.get(download_url, stream=True)
+    # Upload to S3
+    upload_result = context.resources.s3.upload_json(s3_key, api_data)
 
-    # Check if we need to confirm download for large files
-    if 'download_warning' in response.url:
-        # Extract the confirmation token
-        token = response.url.split('id=')[1].split('&')[0]
-        confirm_url = f"https://drive.google.com/uc?export=download&confirm=t&id={file_id}"
-        response = session.get(confirm_url, stream=True)
+    # Also upload to a "latest" version
+    latest_key = "traffy/geojson/latest.json"
+    context.resources.s3.upload_json(latest_key, api_data)
 
-    # Check if the download was successful
-    if response.status_code != 200:
-        error_msg = f"Failed to download file: HTTP {response.status_code}"
-        context.log.error(error_msg)
-        raise Exception(error_msg)
+    # Return metadata about the asset
+    return {
+        "s3_location": upload_result,
+        "timestamp": timestamp,
+        "data_size_bytes": len(json.dumps(api_data)),
+        "features_count": len(api_data.get("features", [])) if "features" in api_data else None
+    }
 
-    # Get content length if available
-    content_length = response.headers.get('content-length')
-    if content_length:
-        total_size = int(content_length)
-        context.log.info(f"Downloading file of size: {total_size} bytes")
+# Define resources
+resources = {
+    "api": ApiResource(
+        base_url="https://publicapi.traffy.in.th/teamchadchart-stat-api/geojson/v1"
+    ),
+    "s3": S3Resource()
+}
 
-    try:
-        # Stream the file directly to S3 using multipart upload
-        mp_upload = s3_client.create_multipart_upload(
-            Bucket=S3_BUCKET,
-            Key=s3_key
-        )
-
-        # Process in chunks to handle large files
-        parts = []
-        part_number = 1
-        chunk_size = 5 * 1024 * 1024  # 5MB chunks, minimum for S3 multipart
-        buffer = io.BytesIO()
-        bytes_transferred = 0
-
-        for chunk in response.iter_content(chunk_size=1024 * 1024):  # 1MB reading chunks
-            if chunk:
-                buffer.write(chunk)
-                buffer.flush()
-                bytes_transferred += len(chunk)
-
-                # Log progress periodically
-                if content_length and bytes_transferred % (10 * 1024 * 1024) < len(chunk):  # Log every ~10MB
-                    progress = (bytes_transferred / total_size) * 100
-                    context.log.info(f"Download progress: {progress:.1f}%")
-
-                # When we've accumulated enough data, upload a part
-                if buffer.tell() >= chunk_size:
-                    buffer.seek(0)
-                    # Upload part
-                    part = s3_client.upload_part(
-                        Bucket=S3_BUCKET,
-                        Key=s3_key,
-                        PartNumber=part_number,
-                        UploadId=mp_upload['UploadId'],
-                        Body=buffer.read(chunk_size)
-                    )
-                    parts.append({
-                        'PartNumber': part_number,
-                        'ETag': part['ETag']
-                    })
-                    part_number += 1
-
-                    # Keep any remaining data in the buffer
-                    remaining_data = buffer.read()
-                    buffer = io.BytesIO()
-                    buffer.write(remaining_data)
-
-        # Upload any remaining data as the final part
-        if buffer.tell() > 0:
-            buffer.seek(0)
-            part = s3_client.upload_part(
-                Bucket=S3_BUCKET,
-                Key=s3_key,
-                PartNumber=part_number,
-                UploadId=mp_upload['UploadId'],
-                Body=buffer.read()
-            )
-            parts.append({
-                'PartNumber': part_number,
-                'ETag': part['ETag']
-            })
-
-        # Complete the multipart upload
-        s3_client.complete_multipart_upload(
-            Bucket=S3_BUCKET,
-            Key=s3_key,
-            UploadId=mp_upload['UploadId'],
-            MultipartUpload={'Parts': parts}
-        )
-
-        context.log.info(f"Successfully uploaded {bytes_transferred} bytes to {S3_BUCKET}/{s3_key}")
-
-        # Return metadata without loading the entire file into memory
-        return {
-            "s3_bucket": S3_BUCKET,
-            "s3_key": s3_key,
-            "file_size_bytes": bytes_transferred,
-            "timestamp": timestamp
-        }
-
-    except Exception as e:
-        # Abort the multipart upload if something goes wrong
-        context.log.error(f"Error during transfer: {str(e)}")
-        try:
-            s3_client.abort_multipart_upload(
-                Bucket=S3_BUCKET,
-                Key=s3_key,
-                UploadId=mp_upload['UploadId']
-            )
-        except Exception as abort_error:
-            context.log.error(f"Error aborting multipart upload: {str(abort_error)}")
-        raise e
-
-# Define a job to run this asset
-download_job = define_asset_job("download_csv_to_s3_job", selection=[drive_csv_to_s3])
-
-# Define a schedule
-download_schedule = ScheduleDefinition(
-    job=download_job,
-    cron_schedule="* * * * *"
+# Define a job
+traffy_data_job = define_asset_job(
+    "traffy_geojson_job",
+    selection=[traffy_geojson_to_s3]
 )
 
-# Define the Dagster definitions
+# Define a schedule - every 5 minutes
+traffy_schedule = ScheduleDefinition(
+    job=traffy_data_job,
+    cron_schedule="*/5 * * * *"  # Every 5 minutes
+)
+
+# Define Dagster definitions
 defs = Definitions(
-    assets=[drive_csv_to_s3],
-    schedules=[download_schedule]
+    assets=[traffy_geojson_to_s3],
+    resources=resources,
+    schedules=[traffy_schedule],
+    jobs=[traffy_data_job]
 )
