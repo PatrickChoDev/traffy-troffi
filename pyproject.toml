@@ -24,3 +24,7 @@ package-mode = false
 [tool.poetry.group.dev.dependencies]
 jupyter = "^1.1.1"
 tqdm = "^4.67.1"
+
+[tool.dagster]
+module_name = "traffy-troffi.dagster"
+code_location_name = "traffy-troffi"

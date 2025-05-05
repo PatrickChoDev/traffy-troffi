@@ -52,9 +52,21 @@ streamlit run traffy_troffi/app.py
 
 ## Development
 
-To install development dependencies:
+### To install development dependencies:
 ```bash
 poetry install --with dev
 ```
-
 This will install additional tools like Jupyter notebooks for development and experimentation.
+
+### To bootstrap Postgres, S3 storage, and Apache Spark
+```bash
+docker compose up # use -d for daemon mode
+```
+
+### To run Dagster dashboard
+```bash
+dagster dev
+```
+*Notes: Leaves Dagster components commented in compose.yaml except production env*
+
+
