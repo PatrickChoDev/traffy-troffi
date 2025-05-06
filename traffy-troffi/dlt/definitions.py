@@ -4,6 +4,7 @@ from .traffy_fondue import traffy_defs
 from .traffy_geojson import geojson_defs
 from ..resources.s3 import S3Resource
 
+
 def get_dlt_definitions():
     return Definitions.merge(
         Definitions(

@@ -2,7 +2,7 @@ import logging
 from typing import Dict, List, Optional, Any
 
 from dagster import ConfigurableResource, EnvVar
-from pyspark.sql import SparkSession, DataFrameReader, DataFrame
+from pyspark.sql import SparkSession, DataFrame
 
 logger = logging.getLogger(__name__)
 

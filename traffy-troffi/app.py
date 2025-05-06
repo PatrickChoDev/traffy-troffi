@@ -1,7 +1,7 @@
-import streamlit as st
-import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import streamlit as st
 
 # Set page title
 st.title("Streamlit Demo Dashboard")
@@ -115,7 +115,7 @@ status_text = st.empty()
 for i in range(100):
     # Update progress bar
     progress_bar.progress(i + 1)
-    status_text.text(f"Progress: {i+1}%")
+    status_text.text(f"Progress: {i + 1}%")
     # Simulate some computation
     time.sleep(0.05)
 

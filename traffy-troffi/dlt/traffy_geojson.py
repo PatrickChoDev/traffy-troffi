@@ -17,7 +17,7 @@ from ..resources.api import ApiResource
 # First asset: Fetch resources from API
 @asset(required_resource_keys={"traffy_api"},
        group_name="traffy_geojson",
-     compute_kind="json",
+       compute_kind="json",
        description="Fetches GeoJSON resources from Traffy API")
 def traffy_geojson_raw(context: AssetExecutionContext) -> Dict[str, Any]:
     """
@@ -92,7 +92,7 @@ traffy_data_job = define_asset_job(
 # Schedule definition remains the same
 traffy_schedule = ScheduleDefinition(
     job=traffy_data_job,
-    cron_schedule="*/5 * * * *"  # Every 5 minutes
+    cron_schedule="*/10 * * * *"  # Every 10 minutes
 )
 
 resources = {

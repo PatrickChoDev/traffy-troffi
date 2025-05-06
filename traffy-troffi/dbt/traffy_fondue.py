@@ -18,9 +18,15 @@ def traffy_fondue_build_parquet_spark_resource(context) -> SparkSessionResource:
 
 
 # Assets
-@asset
+@asset(
+    name="traffy_fondue_parquet",
+    description="generate parquet file from Traffy Fondue dataset",
+    group_name="traffy_fondue",
+    compute_kind="spark",
+)
 def traffy_fondue_parquet(context, spark: SparkSessionResource):
     """Asset that loads CSV from S3 and writes to parquet format"""
+
     s3_path = "s3a://traffy-troffi/traffy/fondue/traffy_fondue_latest.csv"
     output_path = "s3a://traffy-troffi/spark/traffy_fondue.parquet"
 
@@ -45,6 +51,7 @@ __traffy_fondue_parquet_asset_job = define_asset_job(
     name="traffy_fondue_parquet_asset_job",
     description="Job to build parquet files from Traffy Fondue dataset",
     selection=[traffy_fondue_parquet],
+    run_tags={"kind": "spark"},
 )
 
 traffy_defs = Definitions(
