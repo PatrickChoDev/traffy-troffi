@@ -65,7 +65,7 @@ docker compose up # use -d for daemon mode
 
 ### To run Dagster dashboard
 ```bash
-dagster dev
+dlt dev
 ```
 *Notes: Leaves Dagster components commented in compose.yaml except production env*
 

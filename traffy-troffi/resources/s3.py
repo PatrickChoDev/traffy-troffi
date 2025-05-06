@@ -1,3 +1,5 @@
+import io
+
 from dagster import (
     ConfigurableResource,
     EnvVar
@@ -28,12 +30,12 @@ class S3Resource(ConfigurableResource):
         )
 
     def upload_json(self, key: str, data: Dict[str, Any]) -> Dict[str, str]:
-        """Upload JSON data to S3"""
-        logger.info(f"Uploading data to {self.bucket_name}/{key}")
+        """Upload JSON resources to S3"""
+        logger.info(f"Uploading resources to {self.bucket_name}/{key}")
         try:
             s3_client = self.get_client()
 
-            # Convert data to JSON string
+            # Convert resources to JSON string
             json_data = json.dumps(data, ensure_ascii=False)
 
             # Upload to S3
@@ -41,7 +43,7 @@ class S3Resource(ConfigurableResource):
                 Bucket=self.bucket_name,
                 Key=key,
                 Body=json_data.encode('utf-8'),
-                ContentType='application/json'
+                ExtraArgs={'ContentType': 'application/json'}
             )
 
             return {
@@ -50,4 +52,27 @@ class S3Resource(ConfigurableResource):
             }
         except Exception as e:
             logger.error(f"Error uploading to S3: {e}")
+            raise
+
+    def upload_file(self, file: io.BytesIO, filename: str, content_type: str) -> Dict[str, str]:
+        """Upload a file to S3"""
+        logger.info(f"Uploading file to {self.bucket_name}/{filename}")
+        try:
+            s3_client = self.get_client()
+
+            # Upload to S3
+            s3_client.put_object(
+                Body=file,
+                Bucket=self.bucket_name,
+                Key=filename,
+                ContentType=content_type,
+                # ExtraArgs={'ContentType': content_type}
+            )
+
+            return {
+                "bucket": self.bucket_name,
+                "key": filename
+            }
+        except Exception as e:
+            logger.error(f"Error uploading file to S3: {e}")
             raise

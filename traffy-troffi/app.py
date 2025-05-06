@@ -19,7 +19,7 @@ option = st.sidebar.selectbox(
 if option == "Data Explorer":
     st.header("Data Explorer Demo")
 
-    # Generate sample data
+    # Generate sample resources
     data = pd.DataFrame({
         'Name': ['Alice', 'Bob', 'Charlie', 'David', 'Eva'],
         'Age': [24, 32, 18, 47, 29],
@@ -27,7 +27,7 @@ if option == "Data Explorer":
         'Salary': [60000, 75000, 48000, 92000, 65000]
     })
 
-    # Display data
+    # Display resources
     st.subheader("Sample Data")
     st.dataframe(data)
 
@@ -35,7 +35,7 @@ if option == "Data Explorer":
     name_filter = st.multiselect("Filter by name", data['Name'].tolist())
     if name_filter:
         data = data[data['Name'].isin(name_filter)]
-        st.write("Filtered data:")
+        st.write("Filtered resources:")
         st.dataframe(data)
 
     # Show statistics
@@ -45,7 +45,7 @@ if option == "Data Explorer":
 elif option == "Chart Visualization":
     st.header("Chart Visualization Demo")
 
-    # Create sample data
+    # Create sample resources
     chart_data = pd.DataFrame(
         np.random.randn(20, 3),
         columns=['A', 'B', 'C']
@@ -65,7 +65,7 @@ elif option == "Chart Visualization":
     else:
         st.area_chart(chart_data)
 
-    # Add a slider to show more data manipulation
+    # Add a slider to show more resources manipulation
     num_values = st.slider("Number of values", 5, 100, 20)
     new_data = pd.DataFrame(
         np.random.randn(num_values, 3),
@@ -76,7 +76,7 @@ elif option == "Chart Visualization":
 else:
     st.header("Interactive Map Demo")
 
-    # Generate some random map data
+    # Generate some random map resources
     map_data = pd.DataFrame(
         np.random.randn(1000, 2) / [50, 50] + [37.76, -122.4],
         columns=['lat', 'lon']

@@ -185,7 +185,7 @@ services:
 #      - "-p"
 #      - "4000"
 #      - "-m"
-#      - "traffy-troffi.dagster"
+#      - "traffy-troffi"
 #    environment:
 #      - DAGSTER_POSTGRES_HOST=postgres
 #      - DAGSTER_POSTGRES_PORT=5432
@@ -197,7 +197,7 @@ services:
 #      - S3_SECRET_KEY=${S3_SECRET_KEY:-traffy_secret}
 #      - SPARK_MASTER_URL=spark://spark-master:7077
 #    volumes:
-#      - ./traffy-troffi:/dagster/traffy-troffi
+#      - ./:/dagster
 #      - /var/run/docker.sock:/var/run/docker.sock
 
 volumes:
