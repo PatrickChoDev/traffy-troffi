@@ -2,9 +2,10 @@ import logging
 from typing import Dict, List, Optional, Any
 
 from dagster import ConfigurableResource, EnvVar
-from pyspark.sql import SparkSession
+from pyspark.sql import SparkSession, DataFrameReader, DataFrame
 
 logger = logging.getLogger(__name__)
+
 
 class SparkSessionResource(ConfigurableResource):
     """Enhanced resource for creating and managing a Spark session with specialized support for PostgreSQL and S3"""
@@ -19,6 +20,7 @@ class SparkSessionResource(ConfigurableResource):
     s3_endpoint: str = EnvVar("S3_ENDPOINT").get_value("http://localhost:3900")
     s3_access_key: str = EnvVar("S3_ACCESS_KEY").get_value("")
     s3_secret_key: str = EnvVar("S3_SECRET_KEY").get_value("")
+    s3_region: str = EnvVar("S3_REGION").get_value("us-east-1")
     s3_path_style_access: bool = True  # Typically needed for non-AWS S3 implementations
 
     # PostgreSQL configuration
@@ -31,7 +33,10 @@ class SparkSessionResource(ConfigurableResource):
 
     # Package and driver configuration
     jdbc_driver_path: Optional[str] = EnvVar("JDBC_DRIVER_PATH").get_value(None)
-    default_packages: List[str] = ["org.postgresql:postgresql:42.5.4"]
+    default_packages: List[str] = ["org.postgresql:postgresql:42.5.4",
+                                   "org.apache.hadoop:hadoop-aws:3.3.4",
+                                   "com.amazonaws:aws-java-sdk-bundle:1.12.426"
+                                   ]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -82,21 +87,20 @@ class SparkSessionResource(ConfigurableResource):
             # Configure S3 with direct configurations
             builder = builder.config("spark.hadoop.fs.s3a.access.key", self.s3_access_key)
             builder = builder.config("spark.hadoop.fs.s3a.secret.key", self.s3_secret_key)
+            builder = builder.config("spark.hadoop.fs.s3a.aws.credentials.provider",
+                                     "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider")
 
             # Config for non-AWS S3 (like Garage S3)
             if self.s3_endpoint:
                 builder = builder.config("spark.hadoop.fs.s3a.endpoint", self.s3_endpoint)
-                builder = builder.config("spark.hadoop.fs.s3a.endpoint.region", "us-east-1")
+                builder = builder.config("spark.hadoop.fs.s3a.endpoint.region", self.s3_region)
 
             # Path style access for non-AWS implementations
             if self.s3_path_style_access:
                 builder = builder.config("spark.hadoop.fs.s3a.path.style.access", "true")
                 builder = builder.config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
-
-            # Use built-in S3A implementation
-            builder = builder.config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-            builder = builder.config("spark.hadoop.fs.s3a.aws.credentials.provider",
-                                     "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider")
+                builder = builder.config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+                builder = builder.config("spark.hadoop.fs.s3a.multiobjectdelete.enable", "false")
 
         # Add JDBC driver if specified
         if self.jdbc_driver_path:
@@ -116,7 +120,7 @@ class SparkSessionResource(ConfigurableResource):
         return self.build_session()
 
     # S3 Operations
-    def read_s3_csv(self, path: str, **options) -> Any:
+    def read_s3_csv(self, path: str, **options) -> DataFrame:
         """Read a CSV file from S3 into a Spark DataFrame"""
         s3_path = self._format_s3_path(path)
         session = self.get_session()

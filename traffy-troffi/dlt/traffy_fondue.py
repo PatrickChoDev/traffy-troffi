@@ -1,8 +1,7 @@
-import io
 from datetime import datetime
 from typing import Dict, Any
 
-from dagster import Definitions, job, resource, asset, AssetExecutionContext, define_asset_job
+from dagster import Definitions, resource, asset, AssetExecutionContext, define_asset_job
 
 from ..resources.gdrive import GoogleDriveResource
 from ..resources.s3 import S3Resource
@@ -39,6 +38,7 @@ def traffy_fondue_dataset(context) -> Dict[str, Any]:
         "timestamp": timestamp,
     }
 
+
 # Define an asset of the uploaded S3 dataset
 @asset(
     required_resource_keys={"s3"},
@@ -47,13 +47,13 @@ def traffy_fondue_dataset(context) -> Dict[str, Any]:
     name="traffy_fondue_dataset_s3",
     description="Uploads the downloaded dataset to S3"
 )
-def traffy_fondue_dataset_s3(context: AssetExecutionContext, traffy_fondue_dataset: Dict[str,Any]) -> Dict[str, str]:
+def traffy_fondue_dataset_s3(context: AssetExecutionContext, traffy_fondue_dataset: Dict[str, Any]) -> Dict[str, str]:
     """Asset that uploads the downloaded dataset to S3."""
 
     # Upload the file to S3
     context.log.info("Uploading file to S3...")
     run_id = context.dagster_run.run_id
-    s3: S3Resource  = context.resources.s3
+    s3: S3Resource = context.resources.s3
     output = s3.upload_file(
         file=traffy_fondue_dataset['resource'],
         filename=f"traffy/fondue/traffy_fondue_{traffy_fondue_dataset['timestamp']}.csv",
@@ -73,6 +73,7 @@ def traffy_fondue_dataset_s3(context: AssetExecutionContext, traffy_fondue_datas
     # Return the DataFrame
     return output
 
+
 # Define a job to download and upload the dataset
 ingest_traffy_fondue_dataset_job = define_asset_job(
     name="ingest_traffy_fondue_dataset_job",
@@ -81,7 +82,7 @@ ingest_traffy_fondue_dataset_job = define_asset_job(
 )
 
 # Create definitions object for deployment
-defs = Definitions(
+traffy_defs = Definitions(
     assets=[traffy_fondue_dataset, traffy_fondue_dataset_s3],
     jobs=[ingest_traffy_fondue_dataset_job],
     resources={"traffy_fondue_gdrive": traffy_fondue_gdrive},

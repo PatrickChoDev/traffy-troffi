@@ -1,4 +1,8 @@
 from dagster import Definitions
-from .dlt import defs as dlt_defs
+from .dlt.definitions import get_dlt_definitions
+from .dbt.definitions import get_dbt_definitions
 
-# defs = Definitions.merge(dlt_defs)
+defs = Definitions.merge(
+    get_dlt_definitions(),
+    get_dbt_definitions()
+)

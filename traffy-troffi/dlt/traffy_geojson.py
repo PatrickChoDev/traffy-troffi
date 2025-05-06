@@ -102,7 +102,7 @@ resources = {
 }
 
 # Define Dagster definitions
-defs = Definitions(
+geojson_defs = Definitions(
     assets=[traffy_geojson_raw, traffy_geojson_s3],
     resources=resources,
     schedules=[traffy_schedule],
