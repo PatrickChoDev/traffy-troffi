@@ -84,7 +84,7 @@ def traffy_geojson_s3(context: AssetExecutionContext, traffy_data: Dict[str, Any
 
 # Define a job that includes both assets
 traffy_data_job = define_asset_job(
-    "traffy_geojson_job",
+    "ingest_traffy_geojson_job",
     description="Job that downloads GeoJSON resources from Traffy API and uploads them to S3",
     selection=[traffy_geojson_raw, traffy_geojson_s3]
 )

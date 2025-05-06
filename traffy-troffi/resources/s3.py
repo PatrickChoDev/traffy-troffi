@@ -44,7 +44,7 @@ class S3Resource(ConfigurableResource):
                 Bucket=self.bucket_name,
                 Key=key,
                 Body=json_data.encode('utf-8'),
-                ExtraArgs={'ContentType': 'application/json'}
+                ContentType='application/json',
             )
 
             return {
@@ -67,12 +67,11 @@ class S3Resource(ConfigurableResource):
                 Bucket=self.bucket_name,
                 Key=filename,
                 ContentType=content_type,
-                # ExtraArgs={'ContentType': content_type}
             )
 
             return {
-                "bucket": self.bucket_name,
-                "key": filename
+                "Bucket": self.bucket_name,
+                "Key": filename
             }
         except Exception as e:
             logger.error(f"Error uploading file to S3: {e}")
