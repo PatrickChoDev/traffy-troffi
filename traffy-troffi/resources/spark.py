@@ -1,7 +1,8 @@
 import logging
 from typing import Dict, List, Optional, Any
-from pyspark.sql import SparkSession
+
 from dagster import ConfigurableResource, EnvVar
+from pyspark.sql import SparkSession
 
 logger = logging.getLogger(__name__)
 
@@ -105,8 +106,8 @@ class SparkSessionResource(ConfigurableResource):
         # Build the session
         logger.info(f"Building Spark session with app name: {self.app_name}, master: {self.master}")
         self._session = builder.config("spark.driver.extraJavaOptions", "-Djava.security.manager=allow") \
-                        .config("spark.executor.extraJavaOptions", "-Djava.security.manager=allow") \
-                        .getOrCreate()
+            .config("spark.executor.extraJavaOptions", "-Djava.security.manager=allow") \
+            .getOrCreate()
 
         return self._session
 

@@ -1,11 +1,12 @@
-from dagster import ConfigurableResource, EnvVar
+import logging
 from typing import Optional, Dict, Any, List
-import os
+
 import psycopg2
 import psycopg2.extras
-import logging
+from dagster import ConfigurableResource, EnvVar
 
 logger = logging.getLogger(__name__)
+
 
 class PostgresSQLResource(ConfigurableResource):
     """Resource for interacting with PostgresSQL database"""
@@ -116,10 +117,10 @@ class PostgresSQLResource(ConfigurableResource):
     def table_exists(self, table_name: str) -> bool:
         """Check if a table exists in the database"""
         query = """
-                SELECT EXISTS (
-                    SELECT FROM information_schema.tables
-                    WHERE table_schema = %s AND table_name = %s
-                ) \
+                SELECT EXISTS (SELECT
+                               FROM information_schema.tables
+                               WHERE table_schema = %s
+                                 AND table_name = %s) \
                 """
         with self._get_connection() as conn:
             with conn.cursor() as cursor:

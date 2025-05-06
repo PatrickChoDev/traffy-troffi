@@ -1,5 +1,6 @@
 import io
 import logging
+
 import requests
 from dagster import ConfigurableResource
 
@@ -82,7 +83,8 @@ class GoogleDriveResource(ConfigurableResource):
                 logger.info(f"Found direct download link: {download_link}")
                 response = requests.get(download_link, stream=True)
             else:
-                raise RuntimeError("Failed to download file — received HTML page instead of file data and couldn't extract download link.")
+                raise RuntimeError(
+                    "Failed to download file — received HTML page instead of file data and couldn't extract download link.")
 
         buffer = io.BytesIO()
         for chunk in response.iter_content(self.chunk_size):

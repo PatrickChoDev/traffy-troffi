@@ -1,17 +1,18 @@
 import io
-
-from dagster import (
-    ConfigurableResource,
-    EnvVar
-)
-import boto3
 import json
 import logging
 from typing import Dict, Any
 
+import boto3
+from dagster import (
+    ConfigurableResource,
+    EnvVar
+)
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 class S3Resource(ConfigurableResource):
     """Resource for S3 operations"""

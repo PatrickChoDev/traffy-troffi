@@ -1,6 +1,7 @@
 import logging
-from typing import Dict, Any, Optional, Union, BinaryIO
+import os
 from pathlib import Path
+from typing import Dict, Any, Optional, Union
 
 import requests
 from dagster import (
@@ -8,6 +9,7 @@ from dagster import (
 )
 
 logger = logging.getLogger(__name__)
+
 
 class ApiResource(ConfigurableResource):
     """Resource for flexible API interactions supporting JSON resources and file downloads"""
