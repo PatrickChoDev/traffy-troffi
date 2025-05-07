@@ -27,13 +27,13 @@ class SparkSessionResource(ConfigurableResource):
     postgres_user: str = EnvVar("POSTGRES_USER").get_value("postgres")
     postgres_password: str = EnvVar("POSTGRES_PASSWORD").get_value("")
     postgres_db: str = EnvVar("POSTGRES_DB").get_value("traffy-troffi")
-    postgres_host: str = EnvVar("POSTGRES_HOST").get_value("localhost")
+    postgres_host: str = EnvVar("POSTGRES_HOST").get_value("postgres")
     postgres_port: str = EnvVar("POSTGRES_PORT").get_value("5432")
     postgres_schema: str = EnvVar("POSTGRES_SCHEMA").get_value("public")
 
     # Package and driver configuration
     jdbc_driver_path: Optional[str] = EnvVar("JDBC_DRIVER_PATH").get_value(None)
-    default_packages: List[str] = ["org.postgresql:postgresql:42.5.4",
+    default_packages: List[str] = ["org.postgresql:postgresql:42.7.1",
                                    "org.apache.hadoop:hadoop-aws:3.3.4",
                                    "com.amazonaws:aws-java-sdk-bundle:1.12.426"
                                    ]
@@ -60,6 +60,13 @@ class SparkSessionResource(ConfigurableResource):
             "driver": "org.postgresql.Driver",
             "currentSchema": self.postgres_schema
         }
+
+    def get_postgres_connection(self):
+        # Get connection using properties
+        return self.get_session()._jvm.java.sql.DriverManager.getConnection(self.postgres_jdbc_url,
+                                                                            self.postgres_user,
+                                                                            self.postgres_password,
+                                                                            )
 
     def build_session(self) -> SparkSession:
         """Build and return a SparkSession with the configured settings for PostgreSQL and S3"""

@@ -22,7 +22,7 @@ def traffy_fondue_build_parquet_spark_resource(context) -> SparkSessionResource:
     name="traffy_fondue_parquet",
     description="generate parquet file from Traffy Fondue dataset",
     group_name="traffy_fondue",
-    compute_kind="spark",
+    kinds={"python", "s3", "spark"}
 )
 def traffy_fondue_parquet(context, spark: SparkSessionResource):
     """Asset that loads CSV from S3 and writes to parquet format"""
