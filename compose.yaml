@@ -16,7 +16,7 @@ services:
       - postgres-data:/var/lib/postgres/data
       - ./docker/postgres:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -33,14 +33,30 @@ services:
       - "3900:3900"
       - "3901:3901"
     volumes:
-      - ./docker/garage/garage.toml:/etc/garage.toml
+      - ./docker/garage/garage.toml:/etc/garage.toml:ro
       - traffy-s3-meta:/var/lib/garage/meta
       - traffy-s3-data:/var/lib/garage/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3902/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:3902/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
+
+  webui:
+    image: khairul169/garage-webui:latest
+    container_name: garage-webui
+    restart: unless-stopped
+    networks:
+      - traffy-troffi
+    depends_on:
+      - garage
+    volumes:
+      - ./docker/garage/garage.toml:/etc/garage.toml:ro
+    ports:
+      - "3909:3909"
+    environment:
+      API_BASE_URL: "http://garage:3903"
+      S3_ENDPOINT_URL: "http://garage:3900"
 
   # Spark master
   spark-master:
@@ -169,7 +185,7 @@ services:
 #      - "-p"
 #      - "4000"
 #      - "-m"
-#      - "traffy-troffi.dagster"
+#      - "traffy-troffi"
 #    environment:
 #      - DAGSTER_POSTGRES_HOST=postgres
 #      - DAGSTER_POSTGRES_PORT=5432
@@ -181,7 +197,7 @@ services:
 #      - S3_SECRET_KEY=${S3_SECRET_KEY:-traffy_secret}
 #      - SPARK_MASTER_URL=spark://spark-master:7077
 #    volumes:
-#      - ./traffy-troffi:/dagster/traffy-troffi
+#      - ./:/dagster
 #      - /var/run/docker.sock:/var/run/docker.sock
 
 volumes:
