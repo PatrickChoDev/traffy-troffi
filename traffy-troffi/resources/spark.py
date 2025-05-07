@@ -75,6 +75,7 @@ class SparkSessionResource(ConfigurableResource):
 
         # Start building the session
         builder = SparkSession.builder.appName(self.app_name).master(self.master)
+        builder = builder.config("spark.driver.memory", "8g")
 
         # Add Hive support if requested
         if self.enable_hive_support:
