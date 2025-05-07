@@ -4,7 +4,7 @@ from typing import Dict, Any
 
 from dagster import asset, AssetExecutionContext
 from pyspark.sql import DataFrame
-
+    
 from ...resources.spark import SparkSessionResource
 
 logging.basicConfig(level=logging.INFO)
