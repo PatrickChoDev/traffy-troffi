@@ -1,12 +1,9 @@
 import logging
 from datetime import datetime
-from typing import Dict
+from typing import Dict, Any
 
 from dagster import asset, AssetExecutionContext
-from pyspark.ml.feature import StringIndexer
-from pyspark.sql import DataFrame, functions as F
-from pyspark.sql.functions import monotonically_increasing_id
-from pyspark.sql.types import StructType, StructField, StringType, TimestampType, ArrayType, DoubleType, FloatType
+from pyspark.sql import DataFrame
 
 from ...resources.spark import SparkSessionResource
 
@@ -21,10 +18,18 @@ logger = logging.getLogger(__name__)
     kinds={"spark"},
 )
 def processed_traffy_fondue_data(context: AssetExecutionContext, spark: SparkSessionResource,
-                                 traffy_fondue_parquet: Dict[str, str]) -> DataFrame:
+                                 traffy_fondue_parquet: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Loads raw data from S3, processes it, and returns a cleaned DataFrame
+    Loads raw data from S3, processes it, and returns a path to the cleaned DataFrame
     """
+    # Import necessary functions at the top level
+    from pyspark.sql.functions import monotonically_increasing_id
+    import pyspark.sql.functions as F
+    from pyspark.ml.feature import StringIndexer
+    from pyspark.sql.types import StructType, StructField, StringType, TimestampType, DoubleType, ArrayType, FloatType
+    import tempfile
+    import os
+
     spark = spark.get_session()
     df = spark.read.parquet(traffy_fondue_parquet['output_path'])
 
@@ -49,7 +54,6 @@ def processed_traffy_fondue_data(context: AssetExecutionContext, spark: SparkSes
     ).withColumn(
         "categories",
         F.transform(F.col("categories"), lambda x: F.trim(x))
-        # Filter out empty strings
     ).withColumn(
         "categories",
         F.expr("filter(categories, x -> x != '')")
@@ -105,6 +109,8 @@ def processed_traffy_fondue_data(context: AssetExecutionContext, spark: SparkSes
     # Step 2: Print the non-nullable columns for verification
     context.log.debug(f"Non-nullable columns: {non_nullable_columns}")
 
+    cleaned_count = 0
+
     # Step 3: Create a filter condition to keep only rows without nulls in these columns
     if non_nullable_columns:
         filter_condition = " AND ".join([f"{col} IS NOT NULL" for col in non_nullable_columns])
@@ -124,7 +130,19 @@ def processed_traffy_fondue_data(context: AssetExecutionContext, spark: SparkSes
 
     # Create the proper schema DataFrame
     structure_df = spark.createDataFrame(cleaned_df.rdd, schema=complaint_schema)
-    return structure_df
+
+    # Write the DataFrame to a temporary parquet location
+    temp_dir = tempfile.mkdtemp()
+    output_path = os.path.join(temp_dir, "processed_traffy_fondue")
+
+    structure_df.write.parquet(output_path)
+
+    # Return a dictionary with the path and metadata
+    return {
+        "output_path": output_path,
+        "schema": complaint_schema.jsonValue(),
+        "row_count": cleaned_count
+    }
 
 
 @asset(
@@ -136,13 +154,22 @@ def processed_traffy_fondue_data(context: AssetExecutionContext, spark: SparkSes
 def write_processed_traffy_fondue_parquet(
         context: AssetExecutionContext,
         spark: SparkSessionResource,
-        processed_traffy_fondue_data: DataFrame
+        processed_traffy_fondue_data: Dict[str, Any]
 ) -> Dict[str, str]:
     """
     Writes the cleaned DataFrame to S3 in parquet format
     """
-    parquet_path = "s3a://traffy-troffi/spark/traffy/fondue"
-    processed_traffy_fondue_data.write.mode("overwrite").parquet(parquet_path)
+    context.log.info("Writing processed data to S3")
+    parquet_path = "s3a://traffy-troffi/spark/traffy_fondue"
+
+    context.log.info(f"Writing parquet file to {parquet_path}")
+    spark = spark.get_session()
+    context.log.info(f"Spark session: {spark}")
+    context.log.info(f"Processed data: {processed_traffy_fondue_data}")
+    df = spark.read.parquet(processed_traffy_fondue_data["output_path"])
+    context.log.info(f"DataFrame: {df}")
+    df.write.parquet(parquet_path, mode="overwrite")
+    context.log.info("Completed writing parquet file")
 
     return {
         "success": "True",
@@ -159,25 +186,33 @@ def write_processed_traffy_fondue_parquet(
 )
 def store_processed_traffy_fondue_postgres(
         context: AssetExecutionContext,
-        processed_traffy_fondue_data: DataFrame,
+        spark: SparkSessionResource,
+        processed_traffy_fondue_data: Dict[str, Any],
         create_traffy_fondue_postgres_table: Dict[str, str]
-) -> Dict[str, str]:
+) -> Dict[str, Any]:
     """
     Stores the processed data in PostgreSQL and returns timestamp information
     """
-    processed_traffy_fondue_data.write.mode("append").jdbc(
-        table=create_traffy_fondue_postgres_table['postgres_table'],
+    context.log.info("Storing processed data in PostgreSQL")
+    spark_session = spark.get_session()
+    context.log.info(f"Spark session: {spark_session}")
+    context.log.info(f"Processed data: {processed_traffy_fondue_data}")
+    context.log.info(f"Postgres table: {create_traffy_fondue_postgres_table}")
+    df = spark_session.read.parquet(processed_traffy_fondue_data["output_path"])
+    df.write.mode("append").jdbc(
         url="jdbc:postgresql://localhost:5432/traffy-troffi",
+        table=create_traffy_fondue_postgres_table['postgres_table'],
         properties={
-            "user": "postgres",
-            "password": "troffi",
+            "user": spark.postgres_user,
+            "password": spark.postgres_password,
             "driver": "org.postgresql.Driver",
-            "currentSchema": "public"
+            "currentSchema": spark.postgres_schema,
         }
     )
 
     return {
-        "success": "True",
+        "status": "success",
         "timestamp": datetime.now().isoformat(),
-        "table": create_traffy_fondue_postgres_table['postgres_table'],
+        "rows_written": df.count(),
+        "target_table": create_traffy_fondue_postgres_table['postgres_table']
     }
