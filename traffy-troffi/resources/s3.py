@@ -9,6 +9,8 @@ from dagster import (
     EnvVar
 )
 
+import pandas as pd
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -54,6 +56,45 @@ class S3Resource(ConfigurableResource):
         except Exception as e:
             logger.error(f"Error uploading to S3: {e}")
             raise
+    def upload_csv(self, key: str, df: pd.DataFrame) -> Dict[str, str]:
+        """Upload CSV data to S3"""
+        logger.info(f"Uploading CSV to {self.bucket_name}/{key}")
+        try:
+            s3_client = self.get_client()
+            csv_buffer = io.StringIO()
+            df.to_csv(csv_buffer, index=False)
+
+            s3_client.put_object(
+                Bucket=self.bucket_name,
+                Key=key,
+                Body=csv_buffer.getvalue(),
+                ContentType='text/csv'
+            )
+            return {"bucket": self.bucket_name, "key": key}
+        except Exception as e:
+            logger.error(f"Error uploading CSV to S3: {e}")
+            raise
+
+    def upload_parquet(self, key: str, df: pd.DataFrame) -> Dict[str, str]:
+        """Upload Parquet data to S3"""
+        logger.info(f"Uploading Parquet to {self.bucket_name}/{key}")
+        try:
+            s3_client = self.get_client()
+            parquet_buffer = io.BytesIO()
+
+            df.to_parquet(parquet_buffer, index=False)
+            parquet_buffer.seek(0)
+
+            s3_client.put_object(
+                Bucket=self.bucket_name,
+                Key=key,
+                Body=parquet_buffer.getvalue(),
+                ContentType='application/octet-stream'
+            )
+
+            return {"bucket": self.bucket_name, "key": key}
+        except Exception as e:
+            logger.error(f"Error uploading Parquet to S3: {e}")
 
     def upload_file(self, file: io.BytesIO, filename: str, content_type: str) -> Dict[str, str]:
         """Upload a file to S3"""

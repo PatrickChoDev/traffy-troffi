@@ -17,7 +17,7 @@ class SparkSessionResource(ConfigurableResource):
 
     # S3 configuration
     s3_bucket_name: str = EnvVar("S3_BUCKET_NAME").get_value("traffy-troffi")
-    s3_endpoint: str = EnvVar("S3_ENDPOINT").get_value("http://localhost:3900")
+    s3_endpoint: str = EnvVar("S3_ENDPOINT").get_value("http://garage:3900")
     s3_access_key: str = EnvVar("S3_ACCESS_KEY").get_value("")
     s3_secret_key: str = EnvVar("S3_SECRET_KEY").get_value("")
     s3_region: str = EnvVar("S3_REGION").get_value("us-east-1")
