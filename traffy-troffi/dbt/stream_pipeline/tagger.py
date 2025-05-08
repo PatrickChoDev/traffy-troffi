@@ -38,13 +38,13 @@ def untagged_traffy_stream_data(context, traffy_fondue_untagged_postgres_table) 
     df = spark.get_session().read.jdbc(table=traffy_fondue_untagged_postgres_table['postgres_table'],
                                        url=spark.postgres_jdbc_url,
                                        properties=spark.get_postgres_properties())
+
+    output_path = f"s3a://{spark.s3_bucket_name}/spark/traffy_predictions/untagged_{datetime.now().isoformat()}"
+    df.write.mode("overwrite").parquet(output_path)
     empty_df = spark.get_session().createDataFrame([], df.schema)
     empty_df.write.mode("overwrite").jdbc(table=traffy_fondue_untagged_postgres_table['postgres_table'],
                                           url=spark.postgres_jdbc_url,
                                           properties=spark.get_postgres_properties())
-    output_path = f"s3a://{spark.s3_bucket_name}/spark/traffy_predictions/untagged_{datetime.now().isoformat()}"
-    df.write.mode("overwrite").parquet(output_path)
-
     context.log.info(f"Loaded {df.count()} rows from traffy_fondue table")
     return {
         "output_path": output_path,
@@ -66,13 +66,26 @@ def bangkok_geospatial_data(context) -> Dict[str, str]:
 
 @asset(required_resource_keys={"tagger_spark_session_resource"}, kinds={"spark", "geojson"}, group_name="traffy_fondue")
 def geospatial_processed_data(context, untagged_traffy_stream_data: Dict[str, str],
-                              bangkok_geospatial_data: Dict[str, str]):
+                              bangkok_geospatial_data: Dict[str, Any]):
     """Process geospatial data to identify subdistricts and districts"""
     spark = context.resources.tagger_spark_session_resource.get_session()
 
     # Load data using Spark but convert to pandas DataFrame
     context.log.info("Loading untagged data from parquet")
     spark_df = spark.read.parquet(untagged_traffy_stream_data["output_path"])
+
+    # Check if the dataset is empty
+    if spark_df.count() == 0:
+        context.log.warning("Input data is empty, returning empty output")
+        output_path = f"s3a://{context.resources.tagger_spark_session_resource.s3_bucket_name}/spark/traffy_predictions/geoprocessed_{datetime.now().isoformat()}"
+        # Create an empty DataFrame with the same schema
+        empty_df = spark.createDataFrame([], spark_df.schema)
+        empty_df.write.mode("overwrite").parquet(output_path)
+        return {
+            "output_path": output_path,
+            "records_processed": 0
+        }
+
     pandas_df = spark_df.toPandas()
 
     # Load geospatial data with geopandas
@@ -106,8 +119,14 @@ def geospatial_processed_data(context, untagged_traffy_stream_data: Dict[str, st
     # Filter rows with valid subdistrict and district
     final_df = pandas_df[pandas_df['subdistrict'].notna() & pandas_df['district'].notna()]
 
+    # Record metrics
+    records_processed = len(pandas_df)
+    records_with_valid_location = len(final_df)
+    location_match_rate = records_with_valid_location / records_processed if records_processed > 0 else 0
+
     # Convert back to Spark DataFrame for saving
-    context.log.info("Converting processed data back to Spark DataFrame")
+    context.log.info(
+        f"Converting processed data back to Spark DataFrame. Records processed: {records_processed}, valid locations: {records_with_valid_location}")
     final_spark_df = spark.createDataFrame(final_df)
 
     # Save the result
@@ -116,7 +135,10 @@ def geospatial_processed_data(context, untagged_traffy_stream_data: Dict[str, st
     final_spark_df.write.mode("overwrite").parquet(output_path)
 
     return {
-        "output_path": output_path
+        "output_path": output_path,
+        "records_processed": records_processed,
+        "records_with_valid_location": records_with_valid_location,
+        "location_match_rate": location_match_rate
     }
 
 
@@ -132,7 +154,7 @@ def geospatial_processed_data(context, untagged_traffy_stream_data: Dict[str, st
 def store_tagged_traffy_stream_postgres(
         context: AssetExecutionContext,
         spark_predict_pipeline: SparkSessionResource,
-        processed: Dict[str, str],  # Changed to accept from save_result asset
+        processed: Dict[str, Any],  # Changed to accept from save_result asset
         traffy_fondue_unpredicted_postgres_table: Dict[str, str]
 ) -> Dict[str, Any]:
     """
