@@ -26,7 +26,7 @@ def create_traffy_fondue_postgres_table(context: OpExecutionContext) -> Dict[str
                              complaint      TEXT             NOT NULL,
                              timestamp      TIMESTAMP        NOT NULL,
                              image          TEXT             NOT NULL,
-                             image_after    TEXT             NOT NULL,
+                             image_after    TEXT,
                              latitude       DOUBLE PRECISION NOT NULL,
                              longitude      DOUBLE PRECISION NOT NULL,
                              district       VARCHAR(128)     NOT NULL,

@@ -117,3 +117,14 @@ class S3Resource(ConfigurableResource):
         except Exception as e:
             logger.error(f"Error uploading file to S3: {e}")
             raise
+
+    def download_file(self, key: str) -> io.BytesIO:
+        """Download a file from S3"""
+        logger.info(f"Downloading file from {self.bucket_name}/{key}")
+        try:
+            s3_client = self.get_client()
+            response = s3_client.get_object(Bucket=self.bucket_name, Key=key)
+            return io.BytesIO(response['Body'].read())
+        except Exception as e:
+            logger.error(f"Error downloading file from S3: {e}")
+            raise

@@ -167,7 +167,7 @@ class SparkSessionResource(ConfigurableResource):
         return f"s3a://{self.s3_bucket_name}/{path}"
 
     # PostgreSQL Operations
-    def read_postgres_table(self, table_name: str, schema: str = None, **options) -> Any:
+    def read_postgres_table(self, table_name: str, schema: str = None, **options) -> DataFrame:
         """Read a PostgreSQL table into a Spark DataFrame"""
         session = self.get_session()
         props = self.get_postgres_properties()
@@ -180,7 +180,7 @@ class SparkSessionResource(ConfigurableResource):
 
         return session.read.jdbc(
             url=self.postgres_jdbc_url,
-            table=table_with_schema,
+            table=table_name,
             properties=props,
             **options
         )

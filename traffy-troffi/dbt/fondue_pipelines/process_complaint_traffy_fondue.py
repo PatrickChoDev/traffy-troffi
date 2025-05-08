@@ -3,8 +3,7 @@ from datetime import datetime
 from typing import Dict, Any
 
 from dagster import asset, AssetExecutionContext
-from pyspark.sql import DataFrame
-    
+
 from ...resources.spark import SparkSessionResource
 
 logging.basicConfig(level=logging.INFO)
@@ -22,7 +21,7 @@ def processed_traffy_fondue_data(context: AssetExecutionContext, spark: SparkSes
     """
     Loads raw data from S3, processes it, and returns a path to the cleaned DataFrame
     """
-    # Import necessary functions at the top level
+    # Import the necessary functions at the top level
     from pyspark.sql.functions import monotonically_increasing_id
     import pyspark.sql.functions as F
     from pyspark.ml.feature import StringIndexer
