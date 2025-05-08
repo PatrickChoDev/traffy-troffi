@@ -9,6 +9,8 @@ import pydeck as pdk
 import plotly.express as px
 import folium
 from streamlit_folium import st_folium
+from geopy.geocoders import Nominatim
+
 
 # ---------- 1. สร้าง SparkSession ----------
 @st.cache_resource
@@ -244,6 +246,39 @@ with tab1:
     if not traffic_filtered.empty:
         st.subheader("🚦 ตำแหน่งไฟจราจรในเขตนี้")
         st.map(traffic_filtered.rename(columns={"lat": "latitude", "long": "longitude"}))
+    
+    # โหลดไฟล์ bangkok_district.csv แค่ครั้งเดียว (แนะนำให้ใช้ @st.cache_data ถาวร)
+    @st.cache_data
+    def load_bangkok_district_info():
+        return pd.read_csv("./public/bangkok_district.csv")
+
+    district_info_df = load_bangkok_district_info()
+
+    # ดึงเฉพาะข้อมูลของเขตที่เลือก
+    district_row = district_info_df[district_info_df["District_Thai_Name"] == selected_district]
+
+    def clean_value(val):
+        if pd.isnull(val) or str(val).strip() in ["[]", "", "na", "NA", "-", "NaN"]:
+            return "ไม่มี"
+        return val
+
+    if not district_row.empty:
+        row = district_row.iloc[0]
+
+        st.markdown("### 🏙️ ข้อมูลสถานที่สำคัญในเขตนี้")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown(f"**📍 ศาสนสถาน (วัด ฯลฯ):** {clean_value(row['District_Place_of_worship'])}")
+            st.markdown(f"**🏫 สถานศึกษา:** {clean_value(row['District_Education_location'])}")
+            st.markdown(f"**🏛 มรดกวัฒนธรรม:** {clean_value(row['District_Cultural_heritage'])}")
+
+        with col2:
+            st.markdown(f"**🛍 พื้นที่พาณิชย์:** {clean_value(row['District_Commercial_areas'])}")
+            st.markdown(f"**🚇 ระบบขนส่ง:** {clean_value(row['District_Transportation'])}")
+
+    
 
 
 with tab2:
