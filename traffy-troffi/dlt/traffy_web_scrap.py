@@ -5,34 +5,37 @@ import re
 from bs4 import BeautifulSoup
 import time
 
-@asset(required_resource_keys={"s3"})
-def process_raw(context: AssetExecutionContext):
+@asset(required_resource_keys={"s3"},
+        group_name="process_web_scrap_process",
+        compute_kind="json",
+        description="Process scraping the website"
+)
+def process_web_scrap(context: AssetExecutionContext):
 
     processed_folder = "traffy/processed"
     raw_folder ="traffy/raw"
 
     bangkok_wiki_scrap(context,raw_folder, processed_folder)
     green_process(context,raw_folder, processed_folder )
-    pm_process(context,raw_folder, processed_folder )
+    pm_process(context,raw_folder, processed_folder)
     traffic_process(context,raw_folder, processed_folder)
     traffic_congress_process(context,raw_folder, processed_folder)
     waste_process(context,raw_folder, processed_folder)
 @job(
-    description="Job to upload the downloaded dataset to S3",
+    description="Process scraping the website",
 )
-def process_raw_job():
-    process_raw
+def process_web_scrap_job():
+    process_web_scrap
 
-process_raw_defs = Definitions(
-    assets=[process_raw],
-    jobs=[process_raw_job],
+process_web_scrap_defs = Definitions(
+    assets=[process_web_scrap],
+    jobs=[process_web_scrap_job],
 )
 
 # https://data.bangkok.go.th/
 def green_process(context, raw_folder, processed_folder):
     url = "https://data.bangkok.go.th/dataset/d161c1e4-e680-4aed-8be8-37c31046290a/resource/de49c4ca-95c7-405d-9cb6-b02aa11f3cfd/download/-9-.csv"
     df = fetch_csv_with_retries(url)
-
     _save_to_destinations(context, df, raw_folder, processed_folder, "fact_green")
 
 def traffic_process(context, raw_folder, processed_folder):
@@ -71,13 +74,25 @@ def traffic_congress_process(context, raw_folder, processed_folder):
     all_data = []
 
     for url in urls:
-        df = pd.read_excel(url)
-        if 'No' in df.columns:
-            df = df.drop(columns=['No'])
-        all_data.append(df)
+        try:
+            response = requests.head(url, timeout=10)
+            if response.status_code == 200:
+                df = pd.read_excel(url)
+                if 'No' in df.columns:
+                    df = df.drop(columns=['No'])
+                all_data.append(df)
+                print(f"Loaded: {url}")
+            else:
+                print(f"Skipped (status {response.status_code}): {url}")
+        except requests.exceptions.RequestException as e:
+            print(f"Failed to access {url}: {e}")
+        time.sleep(0.5)
 
-    combined_df = pd.concat(all_data, ignore_index=True)
-    _save_to_destinations(context, combined_df, raw_folder, processed_folder, " traffic_congress")
+    if all_data:
+        combined_df = pd.concat(all_data, ignore_index=True)
+        _save_to_destinations(context, combined_df, raw_folder, processed_folder, "traffic_congress")
+    else:
+        print("No data collected due to errors in all URLs.")
 
 def fetch_csv_with_retries(url, retries=5, delay=2):
     for attempt in range(1, retries + 1):
@@ -153,7 +168,7 @@ def bangkok_wiki_scrap(context,raw_folder, processed_folder):
     df = pd.DataFrame(data)
 
     _save_to_destinations(context, df, raw_folder, processed_folder, "bangkok_district")
-    
+
 def extract_location_info(page_soup):
     # Extract Thai Name
     thaiName_tag = page_soup.find('span', {'class': 'mw-page-title-main'})
