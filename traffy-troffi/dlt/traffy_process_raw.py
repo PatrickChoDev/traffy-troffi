@@ -15,7 +15,8 @@ def process_raw(context: AssetExecutionContext):
     green_process(context,raw_folder, processed_folder )
     pm_process(context,raw_folder, processed_folder )
     traffic_process(context,raw_folder, processed_folder)
-
+    traffic_congress_process(context,raw_folder, processed_folder)
+    waste_process(context,raw_folder, processed_folder)
 @job(
     description="Job to upload the downloaded dataset to S3",
 )
@@ -27,9 +28,11 @@ process_raw_defs = Definitions(
     jobs=[process_raw_job],
 )
 
+# https://data.bangkok.go.th/
 def green_process(context, raw_folder, processed_folder):
     url = "https://data.bangkok.go.th/dataset/d161c1e4-e680-4aed-8be8-37c31046290a/resource/de49c4ca-95c7-405d-9cb6-b02aa11f3cfd/download/-9-.csv"
     df = fetch_csv_with_retries(url)
+
     _save_to_destinations(context, df, raw_folder, processed_folder, "fact_green")
 
 def traffic_process(context, raw_folder, processed_folder):
@@ -41,6 +44,40 @@ def pm_process(context, raw_folder, processed_folder):
     url = "https://data.bangkok.go.th/dataset/52a5da69-c086-425a-bcb3-fccfadd824f5/resource/b00b7694-f57e-4255-8971-0b26d4808cb3/download/20park_2564.csv"
     df = fetch_csv_with_retries(url)
     _save_to_destinations(context, df, raw_folder, processed_folder, "fact_pm")
+
+def waste_process(context, raw_folder, processed_folder):
+    url = "https://data.bangkok.go.th/dataset/58771fe2-7614-4ebc-ab0b-a85c84fe19be/resource/f08ef6ac-4c78-47c5-952c-46ffa6e93579/download/garbage.csv"
+    df = fetch_csv_with_retries(url)
+    _save_to_destinations(context, df, raw_folder, processed_folder, "fact_waste")
+
+def traffic_congress_process(context, raw_folder, processed_folder):
+    urls = [
+        "https://data.bangkok.go.th/dataset/dc9bea89-ca70-4b0f-aff4-8660857d1b13/resource/f61c2b7c-7340-4754-9be0-f1a0fe280ac9/download/opendata-jan_ok.xlsx",
+        "https://data.bangkok.go.th/dataset/dc9bea89-ca70-4b0f-aff4-8660857d1b13/resource/3149417b-09bc-4637-9c00-624f944a6315/download/opendata-feb_ok.xlsx",
+        "https://data.bangkok.go.th/dataset/dc9bea89-ca70-4b0f-aff4-8660857d1b13/resource/4842b38c-5ff1-49e6-89fc-017cfe2935a3/download/opendata-mar_ok.xlsx",
+        "https://data.bangkok.go.th/dataset/dc9bea89-ca70-4b0f-aff4-8660857d1b13/resource/032906bb-3f62-442f-8f86-f13e32dfba42/download/opendata-apr_ok.xlsx",
+        "https://data.bangkok.go.th/dataset/dc9bea89-ca70-4b0f-aff4-8660857d1b13/resource/ba0188f4-d8bb-4d33-887c-f5f76731d78c/download/opendata-may_ok.xlsx",
+        "https://data.bangkok.go.th/dataset/dc9bea89-ca70-4b0f-aff4-8660857d1b13/resource/4cb55d09-2028-4d1f-89b4-ed5fba88caf3/download/opendata-jun_ok.xlsx",
+        "https://data.bangkok.go.th/dataset/dc9bea89-ca70-4b0f-aff4-8660857d1b13/resource/935a057b-094b-4f87-872b-081e09d41caa/download/opendata-jul_ok.xlsx",
+        "https://data.bangkok.go.th/dataset/dc9bea89-ca70-4b0f-aff4-8660857d1b13/resource/2f08aeb5-0f9f-480f-8e36-39ffc15cd458/download/opendata-aug_ok.xlsx",
+        "https://data.bangkok.go.th/dataset/dc9bea89-ca70-4b0f-aff4-8660857d1b13/resource/6064c40b-f8b6-4390-bc2b-da405aee18bf/download/opendata-sep_ok.xlsx",
+        "https://data.bangkok.go.th/dataset/dc9bea89-ca70-4b0f-aff4-8660857d1b13/resource/5c6017cf-3ac9-4cda-aace-7e3c76510df1/download/opendata-oct_ok.xlsx",
+        "https://data.bangkok.go.th/dataset/dc9bea89-ca70-4b0f-aff4-8660857d1b13/resource/5cd61444-2dde-4ae4-b2f7-7ea45f292a5e/download/opendata-nov_ok.xlsx",
+        "https://data.bangkok.go.th/dataset/dc9bea89-ca70-4b0f-aff4-8660857d1b13/resource/f90f0322-2a96-4a4e-827e-8f72ad451429/download/opendata-dec_ok.xlsx",
+        "https://data.bangkok.go.th/dataset/dc9bea89-ca70-4b0f-aff4-8660857d1b13/resource/afdb4797-ba79-4682-a73f-cc00035382e1/download/opendata-jan2024_ok.xlsx",
+        "https://data.bangkok.go.th/dataset/dc9bea89-ca70-4b0f-aff4-8660857d1b13/resource/04b01f04-641e-41db-85e2-0a814e396292/download/opendata-feb.-2024_ok.xlsx"
+    ]
+
+    all_data = []
+
+    for url in urls:
+        df = pd.read_excel(url)
+        if 'No' in df.columns:
+            df = df.drop(columns=['No'])
+        all_data.append(df)
+
+    combined_df = pd.concat(all_data, ignore_index=True)
+    _save_to_destinations(context, combined_df, raw_folder, processed_folder, " traffic_congress")
 
 def fetch_csv_with_retries(url, retries=5, delay=2):
     for attempt in range(1, retries + 1):
@@ -57,7 +94,7 @@ def _save_to_destinations(context, df, raw_folder, processed_folder, name):
     context.resources.s3.upload_parquet(f"{raw_folder}/parquet/{name}.parquet", df)
     context.resources.s3.upload_csv(f"{raw_folder}/csv/{name}.csv", df)
 
-    df.to_csv(f"assets/{name}.csv", index=False)
+    df.to_csv(f"public/{name}.csv", index=False)
 
 def bangkok_wiki_scrap(context,raw_folder, processed_folder):
     wikiData = requests.get('https://th.wikipedia.org/wiki/%E0%B8%A3%E0%B8%B2%E0%B8%A2%E0%B8%8A%E0%B8%B7%E0%B9%88%E0%B8%AD%E0%B9%80%E0%B8%82%E0%B8%95%E0%B8%82%E0%B8%AD%E0%B8%87%E0%B8%81%E0%B8%A3%E0%B8%B8%E0%B8%87%E0%B9%80%E0%B8%97%E0%B8%9E%E0%B8%A1%E0%B8%AB%E0%B8%B2%E0%B8%99%E0%B8%84%E0%B8%A3')
@@ -192,6 +229,7 @@ def extract_location_info(page_soup):
         "สถานที่สำคัญ": "District_Important_Place",
         "โรงเรียน|มหาวิทยาลัย|วิทยาลัยของรัฐ|สถาบันการศึกษา": "District_Education_location", 
         "ตลาด|ศูนย์การค้า": "District_Commercial_areas", 
+        "ราชการ|หน่วยงาน": "District_Agency",
         "คมนาคม": "District_Transportation"
     }
 
@@ -201,6 +239,7 @@ def extract_location_info(page_soup):
     cultural_heritage = []
     commercial_areas = []
     transportation = []
+    agency = []
 
     # Loop through the categories and extract corresponding <ul> lists
     for category_terms, category_field in categories.items():
@@ -226,6 +265,8 @@ def extract_location_info(page_soup):
                             commercial_areas.append(text)
                         elif category_field == "District_Transportation":
                             transportation.append(text)
+                        elif category_field == "District_Agency":
+                            agency.append(text)
 
         for h2_tag in page_soup.find_all("h2"):  # Changed to find <h2> tags
             if category_pattern.search(h2_tag.text):  # Match the category pattern
@@ -245,6 +286,8 @@ def extract_location_info(page_soup):
                             commercial_areas.append(text)
                         elif category_field == "District_Transportation":
                             transportation.append(text)
+                        elif category_field == "District_Agency":
+                            agency.append(text)
 
     return {
         "District_Thai_Name": thaiName,
@@ -258,7 +301,8 @@ def extract_location_info(page_soup):
         "District_Education_location": education_location,
         "District_Cultural_heritage": cultural_heritage,
         "District_Commercial_areas": commercial_areas,
-        "District_Transportation": transportation
+        "District_Transportation": transportation,
+        "District_Agency": agency   
     }
 
 def extract_subdistrict_table(page_soup):

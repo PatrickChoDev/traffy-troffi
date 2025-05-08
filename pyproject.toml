@@ -17,7 +17,8 @@ dependencies = [
     "pydrive2 (>=1.21.3,<2.0.0)",
     "requests (>=2.31.0,<3.0.0)",
     "beautifulsoup4 (>=4.12.3,<5.0.0)",
-    "lxml (>=5.2.1,<6.0.0)"
+    "lxml (>=5.2.1,<6.0.0)",
+    "openpyxl (>=3.1.2,<4.0.0)"
 ]
 
 [build-system]
