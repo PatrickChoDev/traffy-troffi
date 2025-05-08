@@ -203,7 +203,8 @@ def predictions_data(
 
         # Create DataFrame with predictions and mapped categories
         predictions_df = spark_session.createDataFrame(
-            [(id, pred, cats) for id, pred, cats in zip(row_ids, encoded_predictions, category_predictions)],
+            [(id, pred, cats) for id, pred, cats in
+             zip(row_ids, encoded_predictions, category_predictions)],
             ["ticket_id", "categories_idx", "categories"]
         )
 
