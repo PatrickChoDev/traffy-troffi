@@ -22,7 +22,7 @@ def process_raw(context: AssetExecutionContext):
 def process_raw_job():
     process_raw
 
-defs = Definitions(
+process_raw_defs = Definitions(
     assets=[process_raw],
     jobs=[process_raw_job],
 )
